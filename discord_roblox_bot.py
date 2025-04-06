@@ -78,5 +78,21 @@ async def scan_profiles(ctx):
     else:
         await ctx.send("✅ No flagged profiles found.")
 
+# /database command
+@bot.command(name="database")
+async def show_database(ctx):
+    """Shows the contents of friends.txt."""
+    try:
+        with open("friends.txt", "r") as f:
+            friends_content = f.read()
+    except FileNotFoundError:
+        await ctx.send("❌ `friends.txt` not found.")
+        return
+    
+    if friends_content.strip():
+        await ctx.send(f"**Contents of friends.txt:**\n```\n{friends_content}\n```")
+    else:
+        await ctx.send("❌ `friends.txt` is empty.")
+
 # Start bot
 bot.run(TOKEN)
