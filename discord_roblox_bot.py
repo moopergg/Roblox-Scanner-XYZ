@@ -8,8 +8,9 @@ import asyncio
 # Get token securely from environment
 TOKEN = os.getenv("DISCORD_TOKEN")
 
-# Bot setup
+# Bot setup with intents
 intents = discord.Intents.default()
+intents.message_content = True  # Enable the message content intent
 bot = commands.Bot(command_prefix='/', intents=intents)
 
 # Suspicious keywords
@@ -93,6 +94,11 @@ async def show_database(ctx):
         await ctx.send(f"**Contents of friends.txt:**\n```\n{friends_content}\n```")
     else:
         await ctx.send("❌ `friends.txt` is empty.")
+
+# Simple test ping command
+@bot.command(name="ping")
+async def ping(ctx):
+    await ctx.send("Pong!")
 
 # Start bot
 bot.run(TOKEN)
