@@ -13,7 +13,7 @@ intents = discord.Intents.default()
 bot = commands.Bot(command_prefix='/', intents=intents)
 
 # Suspicious keywords
-bad_words = ["predator", "grooming", "slut", "slave", "13", "furry", "rp", "daddy", "inch", "tip", "master", "czm", "bull", "snowbunny", "studio", "add for studio"]
+bad_words = ["predator", "grooming", "slut", "slave", "13", "furry", "rp", "daddy", "inch", "tip", "master", "czm", "bull", "snowbunny", "studio", "add for studio", "ykyk", "iykyk", "futa", "fxta", "blacked", "erp", "monster", "BBC"]
 
 # Helper: Extract user ID and trailing number
 def extract_user_id_and_number(line):
