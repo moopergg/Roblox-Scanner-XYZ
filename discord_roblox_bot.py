@@ -5,12 +5,10 @@ import os
 import re
 import asyncio
 
-from keep_alive import keep_alive # NEW
 
 # Get token securely from environment
 TOKEN = os.getenv("DISCORD_TOKEN")
 
-keep_alive() # NEW
 
 # Bot setup with intents
 intents = discord.Intents.default()
