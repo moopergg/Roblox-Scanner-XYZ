@@ -5,10 +5,8 @@ import os
 import re
 import asyncio
 
-
 # Get token securely from environment
 TOKEN = os.getenv("DISCORD_TOKEN")
-
 
 # Bot setup with intents
 intents = discord.Intents.default()
@@ -41,17 +39,20 @@ def get_user_info(user_ids):
 @bot.event
 async def on_ready():
     print(f"✅ Logged in as {bot.user.name}")
+    # Synchronize slash commands after bot is ready
+    await bot.tree.sync()
+    print("Slash commands synced!")
 
 # /scan command
-@bot.command(name="scan")
-async def scan_profiles(ctx):
-    await ctx.send("🔍 Scanning Roblox profiles (1–20)...")
+@bot.tree.command(name="scan", description="Scan Roblox profiles for suspicious activity.")
+async def scan_profiles(interaction: discord.Interaction):
+    await interaction.response.send_message("🔍 Scanning Roblox profiles (1–20)...")
 
     try:
         with open("friends.txt", "r") as f:
             lines = [line.strip() for line in f if line.strip()]
     except FileNotFoundError:
-        await ctx.send("❌ `friends.txt` not found.")
+        await interaction.response.send_message("❌ `friends.txt` not found.")
         return
 
     # Extract and filter
@@ -75,32 +76,31 @@ async def scan_profiles(ctx):
 
     # Respond with results
     if flagged:
-        await ctx.send(f"⚠️ Found {len(flagged)} suspicious profile(s):")
+        await interaction.response.send_message(f"⚠️ Found {len(flagged)} suspicious profile(s):")
         for name, uid, words in flagged:
-            await ctx.send(f"🔸 **{name}** (ID: {uid}) | `{', '.join(words)}`\nhttps://www.roblox.com/users/{uid}/profile")
+            await interaction.followup.send(f"🔸 **{name}** (ID: {uid}) | `{', '.join(words)}`\nhttps://www.roblox.com/users/{uid}/profile")
     else:
-        await ctx.send("✅ No flagged profiles found.")
+        await interaction.response.send_message("✅ No flagged profiles found.")
 
 # /database command
-@bot.command(name="database")
-async def show_database(ctx):
-    """Shows the contents of friends.txt."""
+@bot.tree.command(name="database", description="Show the contents of `friends.txt`.")
+async def show_database(interaction: discord.Interaction):
     try:
         with open("friends.txt", "r") as f:
             friends_content = f.read()
     except FileNotFoundError:
-        await ctx.send("❌ `friends.txt` not found.")
+        await interaction.response.send_message("❌ `friends.txt` not found.")
         return
     
     if friends_content.strip():
-        await ctx.send(f"**Contents of friends.txt:**\n```\n{friends_content}\n```")
+        await interaction.response.send_message(f"**Contents of friends.txt:**\n```\n{friends_content}\n```")
     else:
-        await ctx.send("❌ `friends.txt` is empty.")
+        await interaction.response.send_message("❌ `friends.txt` is empty.")
 
 # Simple test ping command
-@bot.command(name="ping")
-async def ping(ctx):
-    await ctx.send("Pong!")
+@bot.tree.command(name="ping", description="Check if the bot is responsive.")
+async def ping(interaction: discord.Interaction):
+    await interaction.response.send_message("Pong!")
 
 # Start bot
 bot.run(TOKEN)
