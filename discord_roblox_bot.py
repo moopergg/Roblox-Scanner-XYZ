@@ -40,7 +40,7 @@ def get_user_info(user_ids):
 async def on_ready():
     print(f"✅ Logged in as {bot.user.name}")
     # Synchronize slash commands after bot is ready
-    await bot.tree.sync()
+    await bot.tree.sync()  # Sync global slash commands
     print("Slash commands synced!")
 
 # /scan command
