@@ -8,99 +8,97 @@ import asyncio
 # Get token securely from environment
 TOKEN = os.getenv("DISCORD_TOKEN")
 
-# Bot setup with intents
+# Intents
 intents = discord.Intents.default()
-intents.message_content = True  # Enable the message content intent
-bot = commands.Bot(command_prefix='/', intents=intents)
+intents.message_content = True
+
+# Create bot instance
+bot = commands.Bot(command_prefix="/", intents=intents)
 
 # Suspicious keywords
-bad_words = ["predator", "grooming", "slut", "slave", "13", "furry", "rp", "daddy", "inch", "tip", "master", "czm", "bull", "snowbunny", "studio", "add for studio", "ykyk", "iykyk", "futa", "fxta", "blacked", "erp", "monster", "BBC"]
+bad_words = [
+    "predator", "grooming", "slut", "slave", "13", "furry", "rp", "daddy", "inch", "tip",
+    "master", "czm", "bull", "snowbunny", "studio", "add for studio", "ykyk", "iykyk",
+    "futa", "fxta", "blacked", "erp", "monster", "BBC"
+]
 
-# Helper: Extract user ID and trailing number
-def extract_user_id_and_number(line):
-    match = re.match(r"https?://www\.roblox\.com/users/(\d+)/profile\s*-\s*(\d+)", line)
-    if match:
-        user_id, number = match.groups()
-        return user_id, int(number)
-    return None, None
-
-# Call Roblox API to get user info
-def get_user_info(user_ids):
+# Get user info from Roblox API
+async def get_user_info(user_ids):
     url = "https://users.roblox.com/v1/users"
     try:
-        response = requests.post(url, json={"userIds": user_ids}, timeout=10)
+        response = requests.post(url, json={"userIds": list(map(int, user_ids))}, timeout=10)
         if response.status_code == 200:
             return response.json().get("data", [])
+        elif response.status_code == 429:
+            await asyncio.sleep(5)  # Rate limited, wait and retry
+            return await get_user_info(user_ids)
     except requests.exceptions.RequestException:
         pass
     return []
 
-# When bot starts
+# When bot is ready
 @bot.event
 async def on_ready():
     print(f"✅ Logged in as {bot.user.name}")
-    # Synchronize slash commands after bot is ready
-    await bot.tree.sync()  # Sync global slash commands
-    print("Slash commands synced!")
+    try:
+        synced = await bot.tree.sync()
+        print(f"✅ Synced {len(synced)} slash command(s)")
+    except Exception as e:
+        print(f"❌ Failed to sync commands: {e}")
 
 # /scan command
-@bot.tree.command(name="scan", description="Scan Roblox profiles for suspicious activity.")
-async def scan_profiles(interaction: discord.Interaction):
-    await interaction.response.send_message("🔍 Scanning Roblox profiles (1–20)...")
+@bot.tree.command(name="scan", description="Scan Roblox user IDs for suspicious keywords.")
+async def scan(interaction: discord.Interaction, start_id: int, end_id: int):
+    await interaction.response.send_message(f"🔍 Scanning Roblox profiles from ID {start_id} to {end_id}...")
 
-    try:
-        with open("friends.txt", "r") as f:
-            lines = [line.strip() for line in f if line.strip()]
-    except FileNotFoundError:
-        await interaction.response.send_message("❌ `friends.txt` not found.")
-        return
-
-    # Extract and filter
-    user_ids = []
-    for line in lines:
-        user_id, num = extract_user_id_and_number(line)
-        if user_id and num and 1 <= num <= 20:
-            user_ids.append(user_id)
-
+    user_ids = [str(i) for i in range(start_id, end_id + 1)]
     flagged = []
+    chunk_size = 20
 
-    # Chunked API calls
-    for chunk in [user_ids[i:i + 100] for i in range(0, len(user_ids), 100)]:
-        users = get_user_info(chunk)
+    async def scan_chunk(chunk):
+        users = await get_user_info(chunk)
         for user in users:
             description = user.get("description", "").lower()
-            found_words = [word for word in bad_words if word in description]
-            if found_words:
-                flagged.append((user["name"], user["id"], found_words))
-        await asyncio.sleep(1.5)
+            matches = [w for w in bad_words if w in description]
+            if matches:
+                flagged.append((user["name"], user["id"], matches))
 
-    # Respond with results
+    tasks = [scan_chunk(user_ids[i:i+chunk_size]) for i in range(0, len(user_ids), chunk_size)]
+    await asyncio.gather(*tasks)
+
     if flagged:
-        await interaction.response.send_message(f"⚠️ Found {len(flagged)} suspicious profile(s):")
+        await interaction.followup.send(f"⚠️ Found {len(flagged)} suspicious profile(s):")
         for name, uid, words in flagged:
-            await interaction.followup.send(f"🔸 **{name}** (ID: {uid}) | `{', '.join(words)}`\nhttps://www.roblox.com/users/{uid}/profile")
+            await interaction.followup.send(
+                f"🔸 **{name}** (ID: {uid}) | `{', '.join(words)}`\nhttps://www.roblox.com/users/{uid}/profile"
+            )
     else:
-        await interaction.response.send_message("✅ No flagged profiles found.")
+        await interaction.followup.send("✅ No flagged profiles found.")
 
 # /database command
-@bot.tree.command(name="database", description="Show the contents of `friends.txt`.")
+@bot.tree.command(name="database", description="Show the contents of friends.txt.")
 async def show_database(interaction: discord.Interaction):
     try:
-        with open("friends.txt", "r") as f:
-            friends_content = f.read()
-    except FileNotFoundError:
-        await interaction.response.send_message("❌ `friends.txt` not found.")
-        return
-    
-    if friends_content.strip():
-        await interaction.response.send_message(f"**Contents of friends.txt:**\n```\n{friends_content}\n```")
-    else:
-        await interaction.response.send_message("❌ `friends.txt` is empty.")
+        if not os.path.exists("friends.txt"):
+            await interaction.response.send_message("❌ `friends.txt` not found.")
+            return
 
-# Simple test ping command
+        with open("friends.txt", "r") as f:
+            content = f.read()
+
+        preview = content[:1000]
+        await interaction.response.send_message(
+            f"📄 Preview of `friends.txt` (first 1000 characters):\n```\n{preview}\n```"
+        )
+        await interaction.followup.send(file=discord.File("friends.txt"))
+
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Error: {e}")
+
+# /ping command
 @bot.tree.command(name="ping", description="Check if the bot is responsive.")
 async def ping(interaction: discord.Interaction):
-    await interaction.response.send_message("Pong!")
+    await interaction.response.send_message("🏓 Pong!")
 
-# Start bot
+# Start the bot
 bot.run(TOKEN)
