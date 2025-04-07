@@ -5,10 +5,10 @@ import os
 import re
 import asyncio
 
-# Get token securely from environment
+# Get bot token from environment
 TOKEN = os.getenv("DISCORD_TOKEN")
 
-# Intents
+# Discord intents
 intents = discord.Intents.default()
 intents.message_content = True
 
@@ -22,7 +22,7 @@ bad_words = [
     "futa", "fxta", "blacked", "erp", "monster", "BBC"
 ]
 
-# Get user info from Roblox API
+# Helper: fetch user info from Roblox API
 async def get_user_info(user_ids):
     url = "https://users.roblox.com/v1/users"
     try:
@@ -30,13 +30,13 @@ async def get_user_info(user_ids):
         if response.status_code == 200:
             return response.json().get("data", [])
         elif response.status_code == 429:
-            await asyncio.sleep(5)  # Rate limited, wait and retry
+            await asyncio.sleep(5)
             return await get_user_info(user_ids)
     except requests.exceptions.RequestException:
         pass
     return []
 
-# When bot is ready
+# Bot is ready
 @bot.event
 async def on_ready():
     print(f"✅ Logged in as {bot.user.name}")
@@ -63,15 +63,19 @@ async def scan(interaction: discord.Interaction, start_id: int, end_id: int):
             if matches:
                 flagged.append((user["name"], user["id"], matches))
 
-    tasks = [scan_chunk(user_ids[i:i+chunk_size]) for i in range(0, len(user_ids), chunk_size)]
+    tasks = [scan_chunk(user_ids[i:i + chunk_size]) for i in range(0, len(user_ids), chunk_size)]
     await asyncio.gather(*tasks)
 
     if flagged:
-        await interaction.followup.send(f"⚠️ Found {len(flagged)} suspicious profile(s):")
+        summary = f"⚠️ Found {len(flagged)} suspicious profile(s):\n"
+        details = ""
         for name, uid, words in flagged:
-            await interaction.followup.send(
-                f"🔸 **{name}** (ID: {uid}) | `{', '.join(words)}`\nhttps://www.roblox.com/users/{uid}/profile"
-            )
+            details += f"🔸 **{name}** (ID: {uid}) | `{', '.join(words)}`\nhttps://www.roblox.com/users/{uid}/profile\n\n"
+        try:
+            await interaction.user.send(summary + "\n" + details)
+            await interaction.followup.send("✅ Scan complete — results have been sent to your DMs.")
+        except discord.Forbidden:
+            await interaction.followup.send("⚠️ Scan complete, but I couldn’t DM you. Please enable DMs from server members.")
     else:
         await interaction.followup.send("✅ No flagged profiles found.")
 
@@ -100,5 +104,5 @@ async def show_database(interaction: discord.Interaction):
 async def ping(interaction: discord.Interaction):
     await interaction.response.send_message("🏓 Pong!")
 
-# Start the bot
+# Run the bot
 bot.run(TOKEN)
