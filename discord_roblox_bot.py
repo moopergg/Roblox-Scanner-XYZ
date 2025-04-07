@@ -128,12 +128,14 @@ async def show_database(interaction: discord.Interaction):
             content = f.read()
 
         preview = content[:1000]
+        # First response: preview + file
         await interaction.response.send_message(
-            f"📄 Preview of `friends.txt` (first 1000 characters):\n```\n{preview}\n```"
+            f"📄 Preview of `friends.txt` (first 1000 characters):\n```\n{preview}\n```",
+            file=discord.File("friends.txt")
         )
-        await interaction.followup.send(file=discord.File("friends.txt"))
 
     except Exception as e:
+        # Error response: send the error as a message without a followup
         await interaction.response.send_message(f"❌ Error: {e}")
 
 @bot.tree.command(name="ping", description="Check if the bot is responsive.")
